@@ -20,7 +20,7 @@ const (
 	exporterName = "powerwall"
 	exporterVersion = "0.1.0"
 	projectURL = "https://github.com/foogod/powerwall_exporter"
-	defaultListenAddress = ":9869"
+	defaultListenAddress = ":9871"
 	defaultMetricsPath = "/metrics"
 	defaultLoginEmail = "powerwall_exporter@example.org"
 )
