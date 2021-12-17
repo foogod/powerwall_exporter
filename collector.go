@@ -42,7 +42,7 @@ func NewPowerwallCollector(client *powerwall.Client) *powerwallCollector {
 	c.newDesc("battery_output_hz", "Battery output frequency", []string{"serial"})
 	c.newDesc("battery_charged_joules_total", "Total amount of energy charged over battery's lifetime", []string{"serial"})
 	c.newDesc("battery_discharged_joules_total", "Total amount of energy discharged over battery's lifetime", []string{"serial"})
-	c.newDesc("battery_off_grid", "Is battery connected to the grid?", []string{"serial"})
+	c.newDesc("battery_off_grid", "Is battery disconnected from the grid?", []string{"serial"})
 	c.newDesc("battery_island_state", "Is battery running in islanded state?", []string{"serial"})
 	c.newDesc("battery_wobble_detected", "Is frequency wobble detected?", []string{"serial"})
 	c.newDesc("battery_charge_power_clamped", "Has charging power been clamped?", []string{"serial"})
