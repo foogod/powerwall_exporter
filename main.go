@@ -12,11 +12,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/yaml.v2"
+
+	"github.com/foogod/go-powerwall"
 )
 
 const (
 	exporterName = "powerwall"
-	exporterVersion = "0.0.1"
+	exporterVersion = "0.1.0"
 	projectURL = "https://github.com/foogod/powerwall_exporter"
 	defaultListenAddress = ":9869"
 	defaultMetricsPath = "/metrics"
@@ -24,7 +26,7 @@ const (
 )
 
 var options struct {
-    Debug bool `long:"debug" description:"Enable debug messages"`
+	Debug bool `long:"debug" description:"Enable debug messages"`
 	LogStyle string `long:"log.style" description:"Style of log output to produce" choice:"text" choice:"logfmt" choice:"json" default:"text"`
 	ConfigFile string `long:"config.file" description:"Path to config file"`
 }
@@ -58,11 +60,17 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 
+	powerwall.SetLogFunc(pwclientLog)
+
 	log.WithFields(log.Fields{"version": exporterVersion}).Infof("Starting %s exporter", exporterName)
 
 	loadConfig(options.ConfigFile)
 
 	startServer()
+}
+
+func pwclientLog(v ...interface{}) {
+        log.Debug(v...)
 }
 
 type Config struct {
@@ -74,7 +82,7 @@ type WebConfig struct {
 	MetricsPath string `yaml:"metrics-path"`
 }
 type DeviceConfig struct {
-	TegAddress string `yaml:"teg-address"`
+	GatewayAddress string `yaml:"gateway-address"`
 	LoginEmail string `yaml:"login-email"`
 	LoginPassword string `yaml:"login-password"`
 }
@@ -88,9 +96,9 @@ func loadConfig(filename string) {
 	}
 	log.WithFields(log.Fields{"file": absPath}).Info("Loading config")
 	yamlFile, err := ioutil.ReadFile(filename)
-    if err != nil {
+	if err != nil {
 		log.Fatalf("Unable to read config file: %s", err)
-    }
+	}
 
 	// Set defaults
 	config.Web = WebConfig{
@@ -101,13 +109,13 @@ func loadConfig(filename string) {
 		LoginEmail: defaultLoginEmail,
 	}
 
-    err = yaml.UnmarshalStrict(yamlFile, &config)
-    if err != nil {
+	err = yaml.UnmarshalStrict(yamlFile, &config)
+	if err != nil {
 		log.Fatalf("Unable to parse config file: %s", err)
-    }
+	}
 
 	// Check required fields
-	if config.Device.TegAddress == "" {
+	if config.Device.GatewayAddress == "" {
 		log.Fatal("Required parameter device.teg-address not specified in config file")
 	}
 	if config.Device.LoginPassword == "" {
@@ -118,8 +126,10 @@ func loadConfig(filename string) {
 func startServer() {
 	http.HandleFunc("/", indexPageHandler)
 
+	pwclient := powerwall.NewClient(config.Device.GatewayAddress, config.Device.LoginEmail, config.Device.LoginPassword)
+
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(&powerwallCollector{})
+	reg.MustRegister(NewPowerwallCollector(pwclient))
 	regLogger := log.New()
 	regLogger.Level = log.ErrorLevel
 	regHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{
