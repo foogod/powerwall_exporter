@@ -91,16 +91,16 @@ type Config struct {
 	Device DeviceConfig
 }
 type WebConfig struct {
-	ListenAddress string `yaml:"listen-address"`
-	MetricsPath string `yaml:"metrics-path"`
+	ListenAddress string `yaml:"listen_address"`
+	MetricsPath string `yaml:"metrics_path"`
 }
 type DeviceConfig struct {
-	GatewayAddress string `yaml:"gateway-address"`
-	LoginEmail string `yaml:"login-email"`
-	LoginPassword string `yaml:"login-password"`
-	RetryInterval time.Duration `yaml:"retry-interval"`
-	RetryTimeout time.Duration `yaml:"retry-timeout"`
-	TLSCertFile string `yaml:"tls-cert-file"`
+	GatewayAddress string `yaml:"gateway_address"`
+	LoginEmail string `yaml:"login_email"`
+	LoginPassword string `yaml:"login_password"`
+	RetryInterval time.Duration `yaml:"retry_interval"`
+	RetryTimeout time.Duration `yaml:"retry_timeout"`
+	TLSCertFile string `yaml:"tls_cert_file"`
 	cert *x509.Certificate
 }
 
@@ -137,10 +137,10 @@ func loadConfig(filename string) {
 
 	// Check required fields
 	if config.Device.GatewayAddress == "" {
-		log.Fatal("Required parameter device.gateway-address not specified in config file")
+		log.Fatal("Required parameter device.gateway_address not specified in config file")
 	}
 	if config.Device.LoginPassword == "" {
-		log.Fatal("Required parameter device.login-password not specified in config file")
+		log.Fatal("Required parameter device.login_password not specified in config file")
 	}
 }
 
@@ -169,7 +169,7 @@ func loadTLSCert(filename string) {
 
 func fetchTLSCert() {
 	if config.Device.TLSCertFile == "" {
-		log.Fatalf("tls-cert-file not specified in config file")
+		log.Fatalf("device.tls_cert_file not specified in config file")
 	}
 
 	pwclient := powerwall.NewClient(config.Device.GatewayAddress, config.Device.LoginEmail, config.Device.LoginPassword)
