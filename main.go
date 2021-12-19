@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"io/ioutil"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/jessevdk/go-flags"
@@ -18,11 +19,13 @@ import (
 
 const (
 	exporterName = "powerwall"
-	exporterVersion = "0.1.0"
+	exporterVersion = "0.2.0"
 	projectURL = "https://github.com/foogod/powerwall_exporter"
 	defaultListenAddress = ":9871"
 	defaultMetricsPath = "/metrics"
 	defaultLoginEmail = "powerwall_exporter@example.org"
+	defaultRetryInterval = "1s"
+	defaultRetryTimeout = "0s" // Retries disabled by default
 )
 
 var options struct {
@@ -85,6 +88,8 @@ type DeviceConfig struct {
 	GatewayAddress string `yaml:"gateway-address"`
 	LoginEmail string `yaml:"login-email"`
 	LoginPassword string `yaml:"login-password"`
+	RetryInterval time.Duration `yaml:"retry-interval"`
+	RetryTimeout time.Duration `yaml:"retry-timeout"`
 }
 
 var config Config
@@ -101,12 +106,16 @@ func loadConfig(filename string) {
 	}
 
 	// Set defaults
+	retryInterval, _ := time.ParseDuration(defaultRetryInterval)
+	retryTimeout, _ := time.ParseDuration(defaultRetryTimeout)
 	config.Web = WebConfig{
 		ListenAddress: defaultListenAddress,
 		MetricsPath: defaultMetricsPath,
 	}
 	config.Device = DeviceConfig{
 		LoginEmail: defaultLoginEmail,
+		RetryInterval: retryInterval,
+		RetryTimeout: retryTimeout,
 	}
 
 	err = yaml.UnmarshalStrict(yamlFile, &config)
@@ -127,6 +136,7 @@ func startServer() {
 	http.HandleFunc("/", indexPageHandler)
 
 	pwclient := powerwall.NewClient(config.Device.GatewayAddress, config.Device.LoginEmail, config.Device.LoginPassword)
+	pwclient.SetRetry(config.Device.RetryInterval, config.Device.RetryTimeout)
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(NewPowerwallCollector(pwclient))

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/foogod/go-powerwall"
@@ -105,6 +107,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	status, err := c.pw.GetStatus()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching status info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		c.setGauge(ch, "info", 1, status.Version, status.GitHash)
 		c.setCounter64(ch, "uptime_seconds", status.UpTime.Seconds())
@@ -114,6 +119,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	soe, err := c.pw.GetSOE()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching SOE info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		c.setGauge(ch, "charge_ratio", soe.Percentage / 100)
 	}
@@ -121,6 +129,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	opdata, err := c.pw.GetOperation()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching operation info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		c.setGauge(ch, "operation_mode", 1, opdata.RealMode)
 		c.setGauge(ch, "reserve_ratio", opdata.BackupReservePercent / 100)
@@ -129,6 +140,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	sitemaster, err := c.pw.GetSitemaster()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching sitemaster info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		c.setGaugeBool(ch, "sitemaster_running", sitemaster.Running)
 		c.setGaugeBool(ch, "sitemaster_connected", sitemaster.ConnectedToTesla)
@@ -141,6 +155,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	problems, err := c.pw.GetProblems()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching troubleshooting problems info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		c.setGauge64(ch, "problems_detected_count", float64(len(problems.Problems)))
 	}
@@ -148,6 +165,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	sysstatus, err := c.pw.GetSystemStatus()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching system_status info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		c.setGauge(ch, "full_pack_joules", sysstatus.NominalFullPackEnergy * 3600)
 		c.setGauge(ch, "remaining_joules", sysstatus.NominalEnergyRemaining * 3600)
@@ -177,6 +197,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	aggs, err := c.pw.GetMetersAggregates()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching meter aggregates info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		for cat, data := range *aggs {
 			c.setGauge(ch, "instant_power_watts", data.InstantPower, cat)
@@ -218,6 +241,9 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 	nets, err := c.pw.GetNetworks()
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Error fetching networks info")
+		if _, ok := err.(net.Error); ok {
+			return
+		}
 	} else {
 		for _, net := range *nets {
 			name := net.NetworkName
