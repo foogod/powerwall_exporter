@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"io/ioutil"
 	"time"
+	"encoding/pem"
+	"crypto/x509"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/jessevdk/go-flags"
@@ -32,6 +34,7 @@ var options struct {
 	Debug bool `long:"debug" description:"Enable debug messages"`
 	LogStyle string `long:"log.style" description:"Style of log output to produce" choice:"text" choice:"logfmt" choice:"json" default:"text"`
 	ConfigFile string `long:"config.file" description:"Path to config file"`
+	FetchCert bool `long:"fetchcert" description:"Retrieve TLS cert and store it in cert file"`
 }
 
 func setOptionDefaults() {
@@ -69,7 +72,14 @@ func main() {
 
 	loadConfig(options.ConfigFile)
 
-	startServer()
+	if options.FetchCert {
+		fetchTLSCert()
+	} else {
+		if config.Device.TLSCertFile != "" {
+			loadTLSCert(config.Device.TLSCertFile)
+		}
+		startServer()
+	}
 }
 
 func pwclientLog(v ...interface{}) {
@@ -90,6 +100,8 @@ type DeviceConfig struct {
 	LoginPassword string `yaml:"login-password"`
 	RetryInterval time.Duration `yaml:"retry-interval"`
 	RetryTimeout time.Duration `yaml:"retry-timeout"`
+	TLSCertFile string `yaml:"tls-cert-file"`
+	cert *x509.Certificate
 }
 
 var config Config
@@ -97,7 +109,7 @@ var config Config
 func loadConfig(filename string) {
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
-		panic(err)
+		absPath = filename
 	}
 	log.WithFields(log.Fields{"file": absPath}).Info("Loading config")
 	yamlFile, err := ioutil.ReadFile(filename)
@@ -125,11 +137,53 @@ func loadConfig(filename string) {
 
 	// Check required fields
 	if config.Device.GatewayAddress == "" {
-		log.Fatal("Required parameter device.teg-address not specified in config file")
+		log.Fatal("Required parameter device.gateway-address not specified in config file")
 	}
 	if config.Device.LoginPassword == "" {
 		log.Fatal("Required parameter device.login-password not specified in config file")
 	}
+}
+
+func loadTLSCert(filename string) {
+	pemCert, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatalf("Unable to read TLS cert file: %s", err)
+	}
+	block, _ := pem.Decode(pemCert)
+	if block == nil || block.Type != "CERTIFICATE" {
+		log.Fatalf("Contents of TLS cert file do not appear to be a PEM-encoded certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		log.Fatalf("Error parsing cert file: %s", err)
+	}
+
+	config.Device.cert = cert
+
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		absPath = filename
+	}
+	log.WithFields(log.Fields{"file": absPath, "subject": cert.Subject}).Debug("Loaded TLS certificate")
+}
+
+func fetchTLSCert() {
+	if config.Device.TLSCertFile == "" {
+		log.Fatalf("tls-cert-file not specified in config file")
+	}
+
+	pwclient := powerwall.NewClient(config.Device.GatewayAddress, config.Device.LoginEmail, config.Device.LoginPassword)
+
+	cert, err := pwclient.FetchTLSCert()
+	if err != nil {
+		log.Fatalf("Unable to fetch TLS certificate: %s", err)
+	}
+	pemCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	err = ioutil.WriteFile(config.Device.TLSCertFile, pemCert, 0644)
+	if err != nil {
+		log.Fatalf("Unable to write to cert file: %s", err)
+	}
+	log.Infof("TLS certificate retrieved and written to %s", config.Device.TLSCertFile)
 }
 
 func startServer() {
@@ -137,6 +191,10 @@ func startServer() {
 
 	pwclient := powerwall.NewClient(config.Device.GatewayAddress, config.Device.LoginEmail, config.Device.LoginPassword)
 	pwclient.SetRetry(config.Device.RetryInterval, config.Device.RetryTimeout)
+
+	if config.Device.cert != nil {
+		pwclient.SetTLSCert(config.Device.cert)
+	}
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(NewPowerwallCollector(pwclient))
