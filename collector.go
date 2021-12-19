@@ -181,8 +181,6 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 			c.setGauge(ch, "battery_output_volts", block.VOut, serial)
 			c.setGauge(ch, "battery_output_amps", block.IOut, serial)
 			c.setGauge(ch, "battery_output_hz", block.FOut, serial)
-			c.setCounter64(ch, "battery_charged_joules_total", float64(block.EnergyCharged) * 3600, serial)
-			c.setCounter64(ch, "battery_discharged_joules_total", float64(block.EnergyDischarged) * 3600, serial)
 			c.setGaugeBool(ch, "battery_off_grid", block.OffGrid, serial)
 			c.setGaugeBool(ch, "battery_island_state", block.VfMode, serial)
 			c.setGaugeBool(ch, "battery_wobble_detected", block.WobbleDetected, serial)
@@ -191,6 +189,20 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 			c.setGauge(ch, "battery_pinv_state", 1, serial, block.PinvState)
 			c.setGauge(ch, "battery_pinv_grid_state", 1, serial, block.PinvGridState)
 			c.setGauge(ch, "battery_opseq_state", 1, serial, block.OpSeqState)
+
+			// In some circumstances, the powerwall can apparently
+			// report "0" for these stats for some time when
+			// starting up, etc (but then start showing the correct
+			// values once it's fully running).  This can screw up
+			// Prometheus by making it think that the counters have
+			// been reset when they actually haven't, so we just
+			// don't report these stats if they're showing zero.
+			if block.EnergyCharged != 0 {
+				c.setCounter64(ch, "battery_charged_joules_total", float64(block.EnergyCharged) * 3600, serial)
+			}
+			if block.EnergyDischarged != 0 {
+				c.setCounter64(ch, "battery_discharged_joules_total", float64(block.EnergyDischarged) * 3600, serial)
+			}
 		}
 	}
 
@@ -208,11 +220,23 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 			if data.Frequency != 0 {
 				c.setGauge(ch, "frequency_hz", data.Frequency, cat)
 			}
-			c.setCounter64(ch, "exported_joules_total", float64(data.EnergyExported) * 3600, cat)
-			c.setCounter64(ch, "imported_joules_total", float64(data.EnergyImported) * 3600, cat)
 			c.setGauge(ch, "instant_average_volts", data.InstantAverageVoltage, cat)
 			c.setGauge(ch, "instant_average_amps", data.InstantAverageCurrent, cat)
 			c.setGauge(ch, "instant_total_amps", data.InstantTotalCurrent, cat)
+
+			// In some circumstances, the powerwall can apparently
+			// report "0" for these stats for some time when
+			// starting up, etc (but then start showing the correct
+			// values once it's fully running).  This can screw up
+			// Prometheus by making it think that the counters have
+			// been reset when they actually haven't, so we just
+			// don't report these stats if they're showing zero.
+			if data.EnergyExported != 0 {
+				c.setCounter64(ch, "exported_joules_total", float64(data.EnergyExported) * 3600, cat)
+			}
+			if data.EnergyImported != 0 {
+				c.setCounter64(ch, "imported_joules_total", float64(data.EnergyImported) * 3600, cat)
+			}
 
 			devs, err := c.pw.GetMeters(cat)
 			if err != nil {
@@ -228,11 +252,17 @@ func (c *powerwallCollector) Collect(ch chan<- prometheus.Metric) {
 					if data.Frequency != 0 {
 						c.setGauge(ch, "dev_frequency_hz", data.Frequency, cat, devtype, serial)
 					}
-					c.setCounter64(ch, "dev_exported_joules_total", float64(data.EnergyExported) * 3600, cat, devtype, serial)
-					c.setCounter64(ch, "dev_imported_joules_total", float64(data.EnergyImported) * 3600, cat, devtype, serial)
 					c.setGauge(ch, "dev_instant_average_volts", data.InstantAverageVoltage, cat, devtype, serial)
 					c.setGauge(ch, "dev_instant_average_amps", data.InstantAverageCurrent, cat, devtype, serial)
 					c.setGauge(ch, "dev_instant_total_amps", data.InstantTotalCurrent, cat, devtype, serial)
+
+					// (see comment above about exported/imported counters on power-up)
+					if data.EnergyExported != 0 {
+						c.setCounter64(ch, "dev_exported_joules_total", float64(data.EnergyExported) * 3600, cat, devtype, serial)
+					}
+					if data.EnergyImported != 0 {
+						c.setCounter64(ch, "dev_imported_joules_total", float64(data.EnergyImported) * 3600, cat, devtype, serial)
+					}
 				}
 			}
 		}
