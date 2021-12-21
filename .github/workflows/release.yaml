@@ -1,0 +1,31 @@
+# .github/workflows/release.yaml
+
+on: 
+  release:
+    types: [created]
+
+jobs:
+  releases-matrix:
+    name: Release Go Binary
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # build and publish in parallel
+        goos: [linux, freebsd, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:  
+          - goarch: arm64
+            goos: windows 
+    steps:
+    - uses: actions/checkout@v2
+    - uses: wangyoucao577/go-release-action@v1.22
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        goos: ${{ matrix.goos }}
+        goarch: ${{ matrix.goarch }}
+        binary_name: "powerwall_exporter"
+        extra_files: LICENSE README.md examples
+        overwrite: true
+        # This many retries really shouldn't be necessary, but either the uploader or Github seems to be very flaky...
+        retry: 10

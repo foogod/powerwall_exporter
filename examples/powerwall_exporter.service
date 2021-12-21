@@ -1,0 +1,27 @@
+[Unit]
+Description=Prometheus Powerwall Exporter
+After=network.target
+
+[Service]
+User=prometheus
+ExecStart=/usr/local/bin/powerwall_exporter --config.file=/usr/local/etc/powerwall_exporter.yaml
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectClock=true
+ProtectHostname=true
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+DevicePolicy=closed
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
+
